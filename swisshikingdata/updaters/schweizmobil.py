@@ -5,8 +5,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from swisshikingdata.storage import DatastoreClient
-from swisshikingdata.utils.coordinates import CoordinatesConverter
+from ..storage import DatastoreClient
+from ..utils.coordinates import CoordinatesConverter
 
 
 class SchweizMobilUpdater(object):
