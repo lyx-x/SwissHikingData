@@ -3,6 +3,9 @@
 Backend service for Swiss Hiking project. This is meant to fetch hiking
 routes from online providers and aggregate the result into a Datastore.
 
+The frontend code is at https://github.com/lyx-x/SwissHiking. They share
+the same GCP project ID.
+
 ## Installation
 
 To install the package and run `bin/runner.py`, run:
@@ -12,7 +15,7 @@ cd SwissHikingData
 pip3 install -e .
 ```
 
-## How to deploy to GCP Cloud Functions
+## How to setup GCP Cloud Functions
 
 This project is currently running on GCP, this section records necessary steps
 to make it happen (to abide by GCP's requirement). We are going to talk about
@@ -36,10 +39,10 @@ extra configuration.
 
 ### Cloud Source Repositories
 
-This project is hosted on Cloud Source Repositories at
-https://source.developers.google.com/projects/swiss-hiking/repos/SwissHikingData.
-If you are using Github, you need to first import your repository into this
-one so other cloud product can use it.
+This project is hosted on Github and cloned by Cloud Source Repositories at
+https://source.cloud.google.com/swiss-hiking/github_lyx-x_SwissHikingData.
+Cloud Build currently only works with Cloud Source Repositories, hence this
+choice.
 
 ### Cloud Functions
 
@@ -98,5 +101,3 @@ invokes the function at the same time.
 Cloud Scheduler is currently not available in every region, a walk-around
 is to create Cron job in the Frontend App Engine and let the frontend
 publish to the Pub/Sub topic.
-
-The frontend code is at https://github.com/lyx-x/SwissHiking.
