@@ -16,8 +16,8 @@ pip3 install -e .
 
 This project is currently running on GCP, this section records necessary steps
 to make it happen (to abide by GCP's requirement). We are going to talk about
-Cloud Datastore, Cloud Source Repositories, Cloud Functions, Cloud Build and
-Cloud Scheduler.
+Cloud Datastore, Cloud Source Repositories, Cloud Functions, Cloud Build,
+Cloud Pub/Sub and Cloud Scheduler.
 
 ### Cloud Datastore
 
@@ -79,4 +79,24 @@ Cloud Build, you need to follow these steps:
 gcloud iam service-accounts add-iam-policy-binding [PROJECT_ID]@appspot.gserviceaccount.com --member=service-[SOME_NUMBER]@gcf-admin-robot.iam.gserviceaccount.com --role=roles/iam.serviceAccountUser`
 ```
 
+### Cloud Pub/Sub
+
+Pub/Sub lets you publish messages on a topic and subscribe to that topic.
+It can be used as a trigger for Cloud Functions. For this project, we
+created a topic `data-updater` under the same project. We use `attributes`
+field of the message to control the behavior of our function. This is
+almost the same as passing a json data to the HTTP request. However,
+the testing UI of Cloud Functions doesn't seem to work. We need to
+publish a real message on Pub/Sub and look at the log of the execution.
+
 ### Cloud Scheduler
+
+One last piece of the puzzle is to schedule the Cloud Function with a
+cron job. This cron job publishes regularly to the Pub/Sub topic, thus
+invokes the function at the same time.
+
+Cloud Scheduler is currently not available in every region, a walk-around
+is to create Cron job in the Frontend App Engine and let the frontend
+publish to the Pub/Sub topic.
+
+The frontend code is at https://github.com/lyx-x/SwissHiking.
