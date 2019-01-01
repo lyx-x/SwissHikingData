@@ -36,7 +36,7 @@ class DatastoreClient(object):
     # Saves the entity
     self.client.put(entity)
 
-    self.logger.info('Saved {}.'.format(entity.key.name))
+    self.logger.info('Saved {} {} {}.'.format(self.namespace, kind, name))
 
   def get(self, kind: str, name: str):
     """Get an entity from Google Cloud Datastore.

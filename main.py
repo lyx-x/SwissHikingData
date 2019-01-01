@@ -4,44 +4,42 @@ import logging
 from swisshikingdata.updaters.schweizmobil import SchweizMobilUpdater
 
 
-def updater(request):
-  """HTTP Cloud Function.
-  Args:
-    request (flask.Request): The request object.
-    <http://flask.pocoo.org/docs/1.0/api/#flask.Request>
-  Returns:
-    The response text, or any set of values that can be turned into a
-    Response object using `make_response`
-    <http://flask.pocoo.org/docs/1.0/api/#flask.Flask.make_response>.
-  """
-  request_json = request.get_json(silent=True)
-  request_args = request.args
+def update_pubsub(data, context):
+    """Background Cloud Function to be triggered by Pub/Sub.
+    Args:
+         data (dict): The dictionary with data specific to this type of event.
+         context (google.cloud.functions.Context): The Cloud Functions event
+         metadata.
+    """
+    import base64
+    import json
 
-  if request_json:
-    # process argument
-    source = 'SchweizMobil'
-    update_list = False
-    update_track = False
-    if 'source' in request_json:
-      source = request_json['source']
-    if 'update_list' in request_json:
-      update_list = request_json['update_list']
-    if 'update_track' in request_json:
-      update_track = request_json['update_track']
-    
-    # start update
-    if source == 'SchweizMobil':
-      updater = SchweizMobilUpdater()
+    if 'attributes' in data:
+      # process argument
+      request_json = data['attributes']
+      source = 'SchweizMobil'
+      update_list = False
+      update_track = False
+      if 'source' in request_json:
+        source = request_json['source']
+      if 'update_list' in request_json and request_json['update_list'] == 'true':
+        update_list = True
+      if 'update_track' in request_json and request_json['update_track'] == 'true':
+        update_track = True
+      update(source, update_list, update_track)
     else:
-      return '{} is not supported yet.'.format(source)
-    
-    if update_list:
-      logging.info('Updating {} track list.'.format(source))
-      updater.updateTrackList()
-    if update_track:
-      logging.info('Updating {} track.'.format(source))
-      updater.updateTrack()
-  else:
-    return 'Nothing to be performed with json {}'.format(request_json)
+      logging.info('Nothing to be performed with message {}'.format(data))
 
-  return 'Update successful.'
+
+def update(source, update_list, update_track):
+  if source == 'SchweizMobil':
+    updater = SchweizMobilUpdater()
+  else:
+    return '{} is not supported yet.'.format(source)
+  
+  if update_list:
+    logging.info('Updating {} track list.'.format(source))
+    updater.updateTrackList()
+  if update_track:
+    logging.info('Updating {} track.'.format(source))
+    updater.updateTrack()
