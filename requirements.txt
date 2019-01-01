@@ -5,7 +5,7 @@ geojson
 itsdangerous==0.24
 Jinja2==2.10
 MarkupSafe==1.0
-requests==2.19.1
+requests
 setuptools
 Werkzeug==0.14.1
 wheel

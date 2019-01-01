@@ -1,6 +1,6 @@
 steps:
 - name: 'gcr.io/cloud-builders/gcloud'
   args: ['functions', 'deploy', 'swiss-hiking-data-updater', '--source',
-         'https://source.developers.google.com/projects/swiss-hiking/repos/SwissHikingData',
+         'https://source.developers.google.com/projects/swiss-hiking/repos/github_lyx-x_SwissHikingData',
           '--trigger-topic', 'data-updater', '--runtime', 'python37', '--entry-point', 'update_pubsub', '--timeout', '300']
   dir: 'functions/autodeploy'
