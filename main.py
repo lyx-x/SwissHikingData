@@ -17,7 +17,7 @@ def updater(request):
   request_json = request.get_json(silent=True)
   request_args = request.args
 
-  if request_json and 'name' in request_json:
+  if request_json:
     # process argument
     source = 'SchweizMobil'
     update_list = False
