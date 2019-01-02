@@ -165,5 +165,5 @@ class SchweizMobilUpdater(object):
     for i in range(track['stages']):
       self.updateTrackCoordinates(track['id'], stage=i + 1)
     # record timestamp for future update
-    self.update_index += 1
+    self.update_index = (self.update_index + 1) % len(self.cached_tracks)
     self.storage_client.upload('TrackList', 'update_index', value=self.update_index) 
