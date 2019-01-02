@@ -30,7 +30,7 @@ class DatastoreClient(object):
     entity_key = self.client.key(kind, name, namespace=self.namespace)
 
     # Prepares the new entity
-    entity = datastore.Entity(key=entity_key, exclude_from_indexes=['value'])
+    entity = datastore.Entity(key=entity_key, exclude_from_indexes=['value', 'description'])
     entity.update(kwargs)
 
     # Saves the entity

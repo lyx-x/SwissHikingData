@@ -50,9 +50,9 @@ class SchweizMobilUpdater(object):
 
       tracks = [
         {
-          'id': track['number'],
-          'title': track['title_admin'],
-          'stages': len(track['segment_ids']),
+          'id': int(track['number']),
+          # All routes have at least one stage
+          'stages': max(1, len(track['segment_ids'])),
         } for track in raw_tracks['result']['items']
       ]
       return sorted(tracks, key=lambda track: track['id'])
@@ -64,23 +64,15 @@ class SchweizMobilUpdater(object):
     tracks = json.dumps(self.cached_tracks, ensure_ascii=False)
     self.storage_client.upload('TrackList', 'list', value=tracks)
 
-  def getTrackCoordinates(self, id: str, **kwargs):
+  def getTrackCoordinates(self, id: int, stage: int):
     base_url = 'https://map.schweizmobil.ch/api/4/query/featuresmultilayers'
-    if 'stage' in kwargs:
-      id = '{}.{}'.format(id, kwargs.get('stage'))
-      params = {
-        'WanderlandEtappenNational' : id,
-        'WanderlandEtappenRegional' : id,
-        'WanderlandEtappenLokal' : id,
-        'WanderlandEtappenHandicap' : id,
-        }
-    else:
-      params = {
-        'WanderlandRoutenNational' : id,
-        'WanderlandRoutenRegional' : id,
-        'WanderlandRoutenLokal' : id,
-        'WanderlandRoutenHandicap' : id,
-        }
+    key = '{}.{:02d}'.format(id, stage)
+    params = {
+      'WanderlandEtappenNational' : key,
+      'WanderlandEtappenRegional' : key,
+      'WanderlandEtappenLokal' : key,
+      'WanderlandEtappenHandicap' : key,
+      }
 
     params = urllib.parse.urlencode(params)
     url = base_url + '?' + params
@@ -90,38 +82,88 @@ class SchweizMobilUpdater(object):
     except urllib.error.HTTPError as e:
       self.logger.warn('The server couldn\'t fulfill the request.')
       self.logger.warn('Error code: ', e.code)
-      return id, None
+      return key, None
     except urllib.error.URLError as e:
       self.logger.warn('We failed to reach a server.')
       self.logger.warn('Reason: ', e.reason)
-      return id, None
+      return key, None
     else:
       # everything is fine
       res = response.read()
       self.logger.info('Fetching is successful.')
-      res = geojson.loads(res)
+      res = geojson.loads(res)['features'][0]
+      if res['geometry']['type'] == 'MultiLineString':
+        ch1903_start = res['geometry']['coordinates'][0][0]
+      else:
+        ch1903_start = res['geometry']['coordinates'][0]
+      ch1903_id = res['id']
+
+      # new coordinates
       res = geojson.utils.map_tuples(lambda x: CoordinatesConverter.ch1903ToWgs84(x[0], x[1]), res)
 
-      return id, res
+      # get track info
+      base_url = 'https://map.schweizmobil.ch/api/4/feature/query'
+      params = {
+        'attributes' : 'yes',
+        'restriction' : 1024,
+        'type' : 'etappen',
+        'language': 'en',
+        'land' : 'all',
+        'category': 'all',
+        'simplify': '100000',
+        'layers': 'WanderlandEtappenNational,WanderlandEtappenRegional,WanderlandEtappenLokal,WanderlandEtappenHandicap',
+        'bbox': '{0},{1},{0},{1}'.format(int(ch1903_start[0]), int(ch1903_start[1]))
+        }
 
-  def updateTrackCoordinates(self, id: str, **kwargs):
-    self.logger.info('Updating track {} with arguments [{}].'.format(id, kwargs))
-    id, route = self.getTrackCoordinates(id, **kwargs)
+      params = urllib.parse.urlencode(params)
+      url = base_url + '?' + params
+      req = urllib.request.Request(url)
+      try:
+        response = urllib.request.urlopen(req)
+      except urllib.error.HTTPError as e:
+        self.logger.warn('The server couldn\'t fulfill the request.')
+        self.logger.warn('Error code: ', e.code)
+        return key, None
+      except urllib.error.URLError as e:
+        self.logger.warn('We failed to reach a server.')
+        self.logger.warn('Reason: ', e.reason)
+        return key, None
+      else:
+        infos = response.read()
+        infos = geojson.loads(infos)['features']
+        infos = [x for x in infos if x['id'] == ch1903_id]
+        if len(infos) == 0:
+          return key, None
+        else:
+          # overwrite the old info
+          res['properties'] = infos[0]['properties']
+
+        if res['properties']['e_number'] != key:
+          raise AssertionError(
+            'e_number for id={}, stage={} is expected to be {}, found {}.'.format(
+              id, stage, key, res['properties']['e_number']))
+        return key, res
+
+  def updateTrackCoordinates(self, id: int, stage: int):
+    self.logger.info('Updating track id={}, stage={}.'.format(id, stage))
+    key, route = self.getTrackCoordinates(id, stage)
+
+    # generate description from an up-to-date track info
+    info = route['properties']
+    description = '{:04d}.{:02d} {} ({} - {})'.format(id, stage, info['title'], info['start'], info['end'])
+    
     route = geojson.dumps(route)
-    self.storage_client.upload('Track', id, value=route)
+    self.storage_client.upload('Track', key, value=route, description=description)
 
   def updateTrack(self):
-    # Get the list of all tracks
+    # get the list of all tracks
     if self.cached_tracks is None:
       tracks = self.storage_client.get('TrackList', 'list')['value']
       self.cached_tracks = json.loads(tracks)
-    # Update one at a time
+    # ppdate one track at a time, oculd be multiple stages
     track = self.cached_tracks[self.update_index]
-    if track['stages'] > 0:
-      for i in range(track['stages']):
-        self.updateTrackCoordinates(track['id'], stage='{:02d}'.format(i + 1))
-    else:
-      self.updateTrackCoordinates(track['id'])
-    # Record timestamp for future update
+    for i in range(track['stages']):
+      self.updateTrackCoordinates(track['id'], stage=i + 1)
+    # record timestamp for future update
     self.update_index += 1
     self.storage_client.upload('TrackList', 'update_index', value=self.update_index) 
