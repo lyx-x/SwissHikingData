@@ -187,17 +187,53 @@ class SchweizMobilUpdater(object):
     if self.cached_tracks is None:
       tracks = self.storage_client.get('TrackList', 'list')['value']
       self.cached_tracks = json.loads(tracks)
-    # update one track at a time, oculd be multiple stages
+    # update one track at a time, could be multiple stages
     track = self.cached_tracks[self.update_index]
     # record timestamp for future update
     self.update_index = (self.update_index + 1) % len(self.cached_tracks)
     self.storage_client.upload('TrackList', 'update_index', value=self.update_index)
 
     # some stage are missing, we need to figure out the number by trying
-    count_updated = 1
+    count_updated = 1  # stage
     count_successful = 0
     # we limit the number of max retries
     while count_successful < track['stages'] and count_updated < 64 and time.time() - start_time < timeout:
       if self.updateTrackCoordinates(track['id'], stage=count_updated):
         count_successful += 1
       count_updated += 1
+
+  def updateBbox(self):
+    stages = {}
+    stage_names = self.storage_client.getNames('Track')
+
+    count = 0
+
+    for key in stage_names:
+      route = json.loads(self.storage_client.get('Track', key)['value'])
+      # all coordinates should be around (8, 47), so 0 and 100 serve as limit
+      bbox = {
+        'west': 100,
+        'south': 100,
+        'east': 0,
+        'north': 0,
+      }
+
+      for lng, lat in route['geometry']['coordinates'][0]:
+        if lng < bbox['west']:
+          bbox['west'] = lng
+        if lng > bbox['east']:
+          bbox['east'] = lng
+        if lat < bbox['south']:
+          bbox['south'] = lat
+        if lat > bbox['north']:
+          bbox['north'] = lat
+
+      stages[key] = {
+        'bbox': bbox,
+        'key': key,
+        'title': route['properties']['title'],
+        'start': route['properties']['start'], 
+        'end': route['properties']['end'],
+      }
+
+    self.storage_client.upload('TrackList', 'stage_list', value=stages)

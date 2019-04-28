@@ -56,3 +56,19 @@ class DatastoreClient(object):
     # The Cloud Datastore key for the new entity
     entity_key = self.client.key(kind, name, namespace=self.namespace)
     return self.client.get(entity_key)
+
+  def getNames(self, kind: str) -> list:
+    """Get a list of names associated with the kind.
+
+    Args:
+      kind: A string used by Datastore to group entities.
+
+    Returns:
+      The requested list of names.
+
+    Raises:
+      N/A
+    """
+    query = self.client.query(kind=kind, namespace=self.namespace)
+    query.keys_only()
+    return [entity.key.id_or_name for entity in query.fetch()]
